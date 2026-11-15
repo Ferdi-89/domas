@@ -53,7 +53,7 @@
     try {
       const { error: profileError } = await client.from('users').upsert({ id: user.id, email: user.email, name: user.user_metadata?.name || user.email.split('@')[0] });
       if (profileError) throw profileError;
-      const { data: cats, error: catError } = await client.from('categories').select('id,name,type').order('name');
+      const { data: cats, error: catError } = await client.from('categories').select('id,name,type,user_id').order('name');
       if (catError) throw catError;
       for (const [name, type] of [['Makanan', 'expense'], ['Pemasukan lain', 'income']]) {
         if (!cats.some(c => c.name === name && c.type === type)) {
