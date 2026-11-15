@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOMAS · Catatan Keuangan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#14221d;background:#f4f7f5;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:28px 16px;background:#f4f7f5}.wrap{max-width:760px;margin:auto}.head{margin-bottom:22px}.eyebrow{color:#16734d;font-size:.78rem;font-weight:750;letter-spacing:.12em;text-transform:uppercase}h1{margin:.3rem 0;font-size:clamp(1.8rem,5vw,2.6rem);letter-spacing:-.04em}.muted{color:#65746d}.card{background:#fff;border:1px solid #e2eae5;border-radius:16px;padding:20px;margin:14px 0;box-shadow:0 8px 28px #163a2410}h2{font-size:1.05rem;margin:0 0 14px}label{display:block;font-size:.85rem;font-weight:650;margin:12px 0 6px}input,select,button{font:inherit;width:100%;padding:11px 12px;border:1px solid #cbd8d0;border-radius:9px;background:#fff;color:inherit}button{background:#176b49;color:white;font-weight:700;border:0;cursor:pointer;margin-top:14px}button.secondary{background:#eef5f0;color:#176b49;border:1px solid #d6e5dc}button:disabled{opacity:.55;cursor:wait}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.inline{display:flex;align-items:center;justify-content:space-between;gap:10px}.inline button{width:auto;margin:0}.hidden{display:none!important}.notice{padding:11px 13px;border-radius:9px;background:#edf5ef;color:#245c3f;margin:12px 0}.notice.error{background:#fff0ed;color:#9c3025}.row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #edf1ee}.row:last-child{border:0}.amount{font-variant-numeric:tabular-nums;font-weight:750}.income{color:#168052}.expense{color:#b44837}.small{font-size:.82rem}.setup details{margin-top:12px}.setup summary{cursor:pointer;color:#176b49;font-weight:650}.footer{font-size:.82rem;line-height:1.55;color:#65746d}@media(max-width:520px){.grid{grid-template-columns:1fr}.card{padding:16px}}
+@media(prefers-color-scheme:dark){:root{color:#e5eee8;background:#101713}body{background:#101713}.card{background:#18231d;border-color:#2b3a31;box-shadow:none}.muted,.footer{color:#a4b4aa}input,select{background:#111a15;color:#e5eee8;border-color:#394b3f}.row{border-color:#2b3a31}.notice{background:#20372a;color:#b8ebc7}.notice.error{background:#3b2421;color:#ffc1b9}button.secondary{background:#26382d;color:#b8ebc7;border-color:#35483b}}
+</style>
+</head>
+<body><main class="wrap">
+<header class="head"><div class="eyebrow">DOMAS · Walking skeleton</div><h1>Catatan keuangan</h1><div class="muted">Masuk → catat transaksi → lihat riwayat tersimpan di Supabase.</div></header>
+<div id="notice" class="notice" role="status" aria-live="polite">Masukkan URL dan anon key Supabase untuk mulai.</div>
+<section id="setup" class="card setup"><h2>Hubungkan Supabase</h2><div class="grid"><div><label for="url">Project URL</label><input id="url" type="url" placeholder="https://project-ref.supabase.co" autocomplete="url"></div><div><label for="key">Publishable / anon key</label><input id="key" type="password" placeholder="sb_publishable_… atau anon key" autocomplete="off"></div></div><button id="connect">Hubungkan</button><details><summary>Belum punya database?</summary><p class="small">Buat project Supabase, jalankan <code>supabase.sql</code> di SQL Editor, lalu masukkan Project URL dan publishable key di atas. Jangan masukkan service-role key di browser.</p></details></section>
+<section id="auth" class="card hidden"><div class="inline"><h2 id="auth-title">Masuk</h2><button id="switch-auth" class="secondary" type="button">Buat akun</button></div><form id="auth-form"><label for="email">Email</label><input id="email" type="email" required autocomplete="email"><label for="password">Kata sandi</label><input id="password" type="password" required minlength="8" autocomplete="current-password"><label id="name-label" class="hidden" for="name">Nama</label><input id="name" class="hidden" maxlength="100" autocomplete="name" placeholder="Nama kamu"><button id="auth-submit">Masuk</button></form></section>
+<section id="app" class="hidden"><section class="card"><div class="inline"><h2 id="welcome">Transaksi</h2><button id="logout" class="secondary" type="button">Keluar</button></div><form id="tx-form"><div class="grid"><div><label for="type">Jenis</label><select id="type"><option value="expense">Pengeluaran</option><option value="income">Pemasukan</option></select></div><div><label for="category">Kategori</label><select id="category" required></select></div></div><div class="grid"><div><label for="amount">Nominal (Rp)</label><input id="amount" type="number" min="1" step="1" required inputmode="numeric" placeholder="25000"></div><div><label for="date">Tanggal</label><input id="date" type="date" required></div></div><label for="description">Catatan (opsional)</label><input id="description" maxlength="500" placeholder="Contoh: makan siang"><button id="save">Simpan transaksi</button></form></section><section class="card"><div class="inline"><h2>Riwayat transaksi</h2><button id="refresh" class="secondary" type="button">Muat ulang</button></div><div id="transactions" class="muted small">Memuat…</div></section></section>
+<p class="footer">Demo vertical slice: autentikasi Supabase, tambah dan baca transaksi milik sendiri (Row Level Security). Gunakan hanya anon/publishable key; jangan gunakan service-role key di browser.</p>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id), notice = $('notice');
+  let client, user, signup = false;
+  const say = (text, error = false) => { notice.textContent = text; notice.classList.toggle('error', error); notice.classList.remove('hidden'); };
+  const show = (id, yes) => $(id).classList.toggle('hidden', !yes);
+  const fail = error => say(error?.message || 'Terjadi kesalahan. Coba lagi.', true);
+  $('date').value = new Date().toISOString().slice(0, 10);
+  $('connect').onclick = async () => {
+    const url = $('url').value.trim().replace(/\/$/, ''), key = $('key').value.trim();
+    if (!/^https:\/\/[\w.-]+\.supabase\.co$/.test(url) || !key) return say('URL Supabase atau publishable/anon key tidak valid.', true);
+    if (!window.supabase?.createClient) return say('SDK Supabase gagal dimuat. Periksa koneksi internet lalu muat ulang.', true);
+    client = window.supabase.createClient(url, key);
+    const { data: { session }, error } = await client.auth.getSession();
+    if (error) return fail(error);
+    show('setup', false); show('auth', !session); show('app', !!session);
+    if (session) { user = session.user; await startApp(); } else say('Terhubung. Masuk atau buat akun.');
+  };
+  $('switch-auth').onclick = () => { signup = !signup; $('auth-title').textContent = signup ? 'Buat akun' : 'Masuk'; $('auth-submit').textContent = signup ? 'Daftar' : 'Masuk'; $('switch-auth').textContent = signup ? 'Sudah punya akun?' : 'Buat akun'; show('name-label', signup); show('name', signup); $('name').required = signup; $('password').autocomplete = signup ? 'new-password' : 'current-password'; };
+  $('auth-form').onsubmit = async e => {
+    e.preventDefault(); $('auth-submit').disabled = true;
+    try {
+      const email = $('email').value.trim(), password = $('password').value;
+      const result = signup
+        ? await client.auth.signUp({ email, password })
+        : await client.auth.signInWithPassword({ email, password });
+      if (result.error) throw result.error;
+      if (!result.data.session) { say('Akun dibuat. Verifikasi email jika diminta, lalu masuk.'); return; }
+      user = result.data.user; show('auth', false); show('app', true); await startApp();
+    } catch (e) { fail(e); } finally { $('auth-submit').disabled = false; }
+  };
+  async function startApp() {
+    $('welcome').textContent = `Halo, ${user.user_metadata?.name || user.email}`;
+    try {
+      const { error: profileError } = await client.from('users').upsert({ id: user.id, email: user.email, name: user.user_metadata?.name || user.email.split('@')[0] });
+      if (profileError) throw profileError;
+      const { data: cats, error: catError } = await client.from('categories').select('id,name,type').order('name');
+      if (catError) throw catError;
+      for (const [name, type] of [['Makanan', 'expense'], ['Pemasukan lain', 'income']]) {
+        if (!cats.some(c => c.name === name && c.type === type)) {
+          const { data, error } = await client.from('categories').insert({ user_id: user.id, name, type }).select('id,name,type').single();
+          if (error) throw error; cats.push(data);
+        }
+      }
+      $('category').innerHTML = cats.map(c => `<option value="${c.id}" data-type="${c.type}">${escapeHtml(c.name)}</option>`).join('');
+      filterCategories(); await loadTransactions(); say('Siap. Tambahkan transaksi pertama.');
+    } catch (e) { fail(e); }
+  }
+  function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function filterCategories() { const type = $('type').value; [...$('category').options].forEach(o => o.hidden = o.dataset.type !== type); const first = [...$('category').options].find(o => o.dataset.type === type); if (first) $('category').value = first.value; }
+  $('type').onchange = filterCategories;
+  $('tx-form').onsubmit = async e => {
+    e.preventDefault(); $('save').disabled = true;
+    try {
+      const amount = Number($('amount').value);
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error('Nominal harus lebih besar dari nol.');
+      const { error } = await client.from('transactions').insert({ user_id: user.id, category_id: Number($('category').value), type: $('type').value, amount, transaction_date: $('date').value, description: $('description').value.trim() || null });
+      if (error) throw error;
+      $('amount').value = ''; $('description').value = ''; await loadTransactions(); say('Transaksi tersimpan.');
+    } catch (e) { fail(e); } finally { $('save').disabled = false; }
+  };
+  async function loadTransactions() {
+    $('transactions').textContent = 'Memuat…';
+    const { data, error } = await client.from('transactions').select('id,type,amount,transaction_date,description,categories(name)').eq('user_id', user.id).order('transaction_date', { ascending: false }).order('id', { ascending: false }).limit(50);
+    if (error) { $('transactions').textContent = ''; throw error; }
+    $('transactions').innerHTML = data.length ? data.map(t => `<div class="row"><div><strong>${escapeHtml(t.description || t.categories?.name || 'Transaksi')}</strong><div class="muted small">${escapeHtml(t.categories?.name || '')} · ${escapeHtml(t.transaction_date)}</div></div><div class="amount ${t.type}">${t.type === 'income' ? '+' : '−'} Rp ${Number(t.amount).toLocaleString('id-ID')}</div></div>`).join('') : 'Belum ada transaksi.';
+  }
+  $('refresh').onclick = async () => { try { await loadTransactions(); say('Riwayat diperbarui.'); } catch (e) { fail(e); } };
+  $('logout').onclick = async () => { const { error } = await client.auth.signOut(); if (error) return fail(error); show('app', false); show('auth', true); say('Kamu sudah keluar.'); };
+})();
+</script></body></html>
