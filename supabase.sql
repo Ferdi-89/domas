@@ -155,7 +155,7 @@ create policy categories_delete on public.categories for delete to authenticated
 create policy transactions_owner on public.transactions for all to authenticated
   using (user_id = (select auth.uid())) with check (
     user_id = (select auth.uid()) and exists (
-      select 1 from public.categories c where c.id = category_id and (c.user_id is null or c.user_id = (select auth.uid()))
+      select 1 from public.categories c where c.id = category_id and c.type = transactions.type and (c.user_id is null or c.user_id = (select auth.uid()))
     )
   );
 create policy budgets_owner on public.budgets for all to authenticated
