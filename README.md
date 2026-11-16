@@ -1,6 +1,6 @@
 # DOMAS — Dompet Mahasiswa
 
-Sistem pengelolaan keuangan mahasiswa berbasis **adaptive web dan mobile**.
+Sistem pengelolaan keuangan mahasiswa berbasis adaptive web dan mobile.
 
 Proyek Kelompok 3 (Tim INISIATOR) — Politeknik Negeri Padang.
 
